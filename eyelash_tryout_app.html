@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lash Studio - Virtual Try-On</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1);
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            transform: scaleX(-1);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .camera-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .camera-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+        }
+
+        .style-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .style-btn {
+            background: white;
+            border: 3px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .style-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .style-btn.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .style-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .style-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .style-desc {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .style-btn.active .style-desc {
+            opacity: 0.9;
+        }
+
+        .permission-guide {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .permission-guide h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.3rem;
+        }
+
+        .permission-steps {
+            text-align: left;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .permission-steps ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .permission-steps li {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .permission-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .permission-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 10px;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .error-container {
+            background: #fff5f5;
+            border: 2px solid #feb2b2;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #742a2a;
+        }
+
+        .intensity-control {
+            width: 100%;
+            max-width: 300px;
+            margin: 20px 0;
+        }
+
+        .intensity-control label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .intensity-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+            appearance: none;
+        }
+
+        .intensity-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .app-container {
+                padding: 20px;
+            }
+            
+            .style-selector {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>✨ Lash Studio</h1>
+        <p>Try on gorgeous eyelash extensions virtually</p>
+    </div>
+
+    <div class="app-container">
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="overlay" class="canvas-overlay"></canvas>
+        </div>
+
+        <div class="controls">
+            <button id="startCamera" class="camera-btn">📸 Enable Camera & Start</button>
+            
+            <div class="status" id="status">Ready to transform your lashes! Click the button above to begin</div>
+
+            <div id="permissionGuide" class="permission-guide" style="display: none;">
+                <h3>🔐 Camera Permission Needed</h3>
+                <p>To try on eyelash extensions, we need access to your camera. Follow these steps:</p>
+                
+                <div class="permission-steps" id="permissionSteps">
+                    <!-- Steps will be populated based on browser/device -->
+                </div>
+                
+                <button onclick="eyelashApp.requestCameraPermission()" class="permission-btn">
+                    🔄 Try Camera Access Again
+                </button>
+                <button onclick="eyelashApp.startDemoMode()" class="permission-btn">
+                    🎬 Use Demo Mode Instead
+                </button>
+            </div>
+
+            <div class="intensity-control">
+                <label for="intensity">Lash Intensity</label>
+                <input type="range" id="intensity" class="intensity-slider" min="0.3" max="1" step="0.1" value="0.8">
+            </div>
+
+            <div class="style-selector">
+                <div class="style-btn active" data-style="natural">
+                    <span class="style-icon">🌿</span>
+                    <div class="style-name">Natural</div>
+                    <div class="style-desc">Subtle & everyday</div>
+                </div>
+                <div class="style-btn" data-style="dramatic">
+                    <span class="style-icon">✨</span>
+                    <div class="style-name">Dramatic</div>
+                    <div class="style-desc">Bold & glamorous</div>
+                </div>
+                <div class="style-btn" data-style="cat-eye">
+                    <span class="style-icon">🐱</span>
+                    <div class="style-name">Cat-Eye</div>
+                    <div class="style-desc">Elongated & sultry</div>
+                </div>
+                <div class="style-btn" data-style="doll-eye">
+                    <span class="style-icon">🎀</span>
+                    <div class="style-name">Doll-Eye</div>
+                    <div class="style-desc">Round & wide-eyed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+    <script>
+        class EyelashTryOn {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('overlay');
+                this.ctx = this.canvas.getContext('2d');
+                this.currentStyle = 'natural';
+                this.intensity = 0.8;
+                this.isModelLoaded = false;
+                this.isDetecting = false;
+                
+                this.initializeElements();
+                this.loadModels();
+            }
+
+            initializeElements() {
+                document.getElementById('startCamera').addEventListener('click', () => this.requestCameraPermission());
+                document.getElementById('intensity').addEventListener('input', (e) => {
+                    this.intensity = parseFloat(e.target.value);
+                });
+                
+                document.querySelectorAll('.style-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.currentStyle = btn.dataset.style;
+                    });
+                });
+            }
+
+            async requestCameraPermission() {
+                // Check if we're in a secure context
+                if (!window.isSecureContext) {
+                    this.showSecurityWarning();
+                    return;
+                }
+
+                // Check if getUserMedia is available
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    this.updateStatus('Camera not supported in this browser. Please try Chrome, Firefox, or Safari.');
+                    return;
+                }
+
+                try {
+                    this.updateStatus('🔐 Requesting camera permission...');
+                    
+                    // First check current permission state
+                    if (navigator.permissions) {
+                        try {
+                            const permission = await navigator.permissions.query({ name: 'camera' });
+                            console.log('Camera permission state:', permission.state);
+                            
+                            if (permission.state === 'denied') {
+                                this.showPermissionGuide();
+                                return;
+                            }
+                        } catch (e) {
+                            // Permission API not fully supported, continue with getUserMedia
+                        }
+                    }
+                    
+                    await this.startCamera();
+                    
+                } catch (error) {
+                    console.error('Permission request error:', error);
+                    this.handleCameraError(error);
+                }
+            }
+
+            showPermissionGuide() {
+                document.getElementById('permissionGuide').style.display = 'block';
+                document.getElementById('startCamera').style.display = 'none';
+                
+                const steps = this.getPermissionSteps();
+                document.getElementById('permissionSteps').innerHTML = steps;
+                
+                this.updateStatus('📱 Camera permission is currently blocked');
+            }
+
+            getPermissionSteps() {
+                const userAgent = navigator.userAgent.toLowerCase();
+                let steps = '';
+                
+                if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+                    steps = `
+                        <h4>For Chrome:</h4>
+                        <ol>
+                            <li>Look for the camera icon 📷 in your address bar</li>
+                            <li>Click it and select "Always allow"</li>
+                            <li>Or go to Chrome Settings → Privacy → Site Settings → Camera</li>
+                            <li>Find this website and change to "Allow"</li>
+                            <li>Refresh this page and try again</li>
+                        </ol>
+                    `;
+                } else if (userAgent.includes('firefox')) {
+                    steps = `
+                        <h4>For Firefox:</h4>
+                        <ol>
+                            <li>Look for the camera icon 📷 in your address bar</li>
+                            <li>Click it and select permissions</li>
+                            <li>Or go to Firefox Settings → Privacy → Permissions → Camera</li>
+                            <li>Find this website and change to "Allow"</li>
+                            <li>Refresh this page and try again</li>
+                        </ol>
+                    `;
+                } else if (userAgent.includes('safari')) {
+                    if (userAgent.includes('mobile') || userAgent.includes('iphone') || userAgent.includes('ipad')) {
+                        steps = `
+                            <h4>For iPhone/iPad Safari:</h4>
+                            <ol>
+                                <li>Go to Settings → Safari → Camera</li>
+                                <li>Make sure "Ask" or "Allow" is selected</li>
+                                <li>Or go to Settings → Privacy → Camera</li>
+                                <li>Make sure Safari is enabled</li>
+                                <li>Return here and try again</li>
+                            </ol>
+                        `;
+                    } else {
+                        steps = `
+                            <h4>For Safari:</h4>
+                            <ol>
+                                <li>Look for the camera icon 📷 in your address bar</li>
+                                <li>Click it to allow camera access</li>
+                                <li>Or go to Safari → Preferences → Websites → Camera</li>
+                                <li>Find this website and set to "Allow"</li>
+                                <li>Refresh this page and try again</li>
+                            </ol>
+                        `;
+                    }
+                } else if (userAgent.includes('edg')) {
+                    steps = `
+                        <h4>For Microsoft Edge:</h4>
+                        <ol>
+                            <li>Look for the camera icon 📷 in your address bar</li>
+                            <li>Click it and select "Allow"</li>
+                            <li>Or go to Edge Settings → Site Permissions → Camera</li>
+                            <li>Find this website and change to "Allow"</li>
+                            <li>Refresh this page and try again</li>
+                        </ol>
+                    `;
+                } else {
+                    steps = `
+                        <h4>General Steps:</h4>
+                        <ol>
+                            <li>Look for a camera icon 📷 in your browser's address bar</li>
+                            <li>Click it and select "Allow" for camera access</li>
+                            <li>Or check your browser's privacy/security settings</li>
+                            <li>Look for "Site Permissions" or "Camera" settings</li>
+                            <li>Allow camera access for this website</li>
+                            <li>Refresh this page and try again</li>
+                        </ol>
+                    `;
+                }
+                
+                return steps;
+            }
+
+            async loadModels() {
+                this.updateStatus('Loading AI models...');
+                try {
+                    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/models');
+                    await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/models');
+                    this.isModelLoaded = true;
+                    this.updateStatus('Ready! Click "Start Camera" to begin');
+                } catch (error) {
+                    console.error('Model loading error:', error);
+                    this.updateStatus('Using simplified detection mode');
+                    this.isModelLoaded = false;
+                }
+            }
+
+            async startCamera() {
+                // Check if we're in a secure context
+                if (!window.isSecureContext) {
+                    this.showSecurityWarning();
+                    return;
+                }
+
+                // Check if getUserMedia is available
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    this.updateStatus('Camera not supported in this browser. Please try Chrome, Firefox, or Safari.');
+                    return;
+                }
+
+                try {
+                    this.updateStatus('Accessing camera...');
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: 'user'
+                        } 
+                    });
+                    
+                    this.video.srcObject = stream;
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        this.startDetection();
+                    });
+                    
+                    document.getElementById('startCamera').style.display = 'none';
+                } catch (error) {
+                    console.error('Camera error:', error);
+                    this.handleCameraError(error);
+                }
+            }
+
+            showSecurityWarning() {
+                const warningHTML = `
+                    <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 10px; padding: 20px; margin: 20px 0; color: #856404;">
+                        <h3 style="margin: 0 0 10px 0;">🔒 Security Notice</h3>
+                        <p style="margin: 0 0 15px 0;">Camera access requires a secure connection (HTTPS). Here are your options:</p>
+                        <ul style="margin: 0 0 15px 20px;">
+                            <li><strong>Option 1:</strong> Access this page via HTTPS (if available)</li>
+                            <li><strong>Option 2:</strong> Test on localhost (localhost is considered secure)</li>
+                            <li><strong>Option 3:</strong> Use the demo mode below to see how it works</li>
+                        </ul>
+                        <button onclick="eyelashApp.startDemoMode()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                            📱 Try Demo Mode
+                        </button>
+                    </div>
+                `;
+                document.getElementById('status').innerHTML = warningHTML;
+            }
+
+            handleCameraError(error) {
+                let message = '';
+                switch(error.name) {
+                    case 'NotAllowedError':
+                        this.showPermissionGuide();
+                        return;
+                    case 'NotFoundError':
+                        message = '📷 No camera found. Please connect a camera and try again.';
+                        break;
+                    case 'NotReadableError':
+                        message = '⚠️ Camera is busy or unavailable. Please close other apps using the camera and try again.';
+                        break;
+                    case 'SecurityError':
+                        this.showSecurityWarning();
+                        return;
+                    case 'OverconstrainedError':
+                        message = '📐 Camera settings not supported. Trying with different settings...';
+                        this.tryFallbackCamera();
+                        return;
+                    default:
+                        message = `❌ Camera error: ${error.message}. Please try refreshing the page.`;
+                }
+                this.showErrorMessage(message);
+            }
+
+            async tryFallbackCamera() {
+                try {
+                    // Try with more basic camera settings
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true 
+                    });
+                    
+                    this.video.srcObject = stream;
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        this.startDetection();
+                    });
+                    
+                    document.getElementById('startCamera').style.display = 'none';
+                    document.getElementById('permissionGuide').style.display = 'none';
+                    
+                } catch (fallbackError) {
+                    this.handleCameraError(fallbackError);
+                }
+            }
+
+            showErrorMessage(message) {
+                const errorHTML = `
+                    <div class="error-container">
+                        <h3>Camera Issue</h3>
+                        <p>${message}</p>
+                        <button onclick="eyelashApp.requestCameraPermission()" class="permission-btn" style="background: #e53e3e; border-color: #e53e3e;">
+                            🔄 Try Again
+                        </button>
+                        <button onclick="eyelashApp.startDemoMode()" class="permission-btn" style="background: #38a169; border-color: #38a169;">
+                            🎬 Use Demo Mode
+                        </button>
+                    </div>
+                `;
+                document.getElementById('status').innerHTML = errorHTML;
+            }
+
+            startDemoMode() {
+                this.updateStatus('🎬 Demo Mode: Showing how eyelash styles would look!');
+                document.getElementById('startCamera').style.display = 'none';
+                
+                // Create a demo canvas that shows the eyelash styles
+                this.canvas.width = 640;
+                this.canvas.height = 480;
+                
+                // Draw a simple face outline for demo
+                this.drawDemoFace();
+                this.startDemoAnimation();
+            }
+
+            drawDemoFace() {
+                this.ctx.fillStyle = '#f4c2a1';
+                this.ctx.strokeStyle = '#d4a574';
+                this.ctx.lineWidth = 2;
+                
+                // Face oval
+                this.ctx.beginPath();
+                this.ctx.ellipse(320, 280, 120, 150, 0, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+                
+                // Eyes
+                this.ctx.fillStyle = 'white';
+                this.ctx.beginPath();
+                this.ctx.ellipse(280, 240, 25, 15, 0, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+                
+                this.ctx.beginPath();
+                this.ctx.ellipse(360, 240, 25, 15, 0, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+                
+                // Pupils
+                this.ctx.fillStyle = '#4a4a4a';
+                this.ctx.beginPath();
+                this.ctx.arc(280, 240, 8, 0, 2 * Math.PI);
+                this.ctx.fill();
+                
+                this.ctx.beginPath();
+                this.ctx.arc(360, 240, 8, 0, 2 * Math.PI);
+                this.ctx.fill();
+                
+                // Nose
+                this.ctx.strokeStyle = '#d4a574';
+                this.ctx.beginPath();
+                this.ctx.moveTo(320, 260);
+                this.ctx.lineTo(315, 280);
+                this.ctx.lineTo(325, 280);
+                this.ctx.stroke();
+                
+                // Mouth
+                this.ctx.beginPath();
+                this.ctx.arc(320, 320, 15, 0, Math.PI);
+                this.ctx.stroke();
+            }
+
+            startDemoAnimation() {
+                this.isDetecting = true;
+                this.animateDemoLashes();
+            }
+
+            animateDemoLashes() {
+                if (!this.isDetecting) return;
+                
+                // Clear only the lash area
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'source-over';
+                
+                // Redraw the face
+                this.drawDemoFace();
+                
+                // Draw current style lashes
+                const leftEye = { x: 280, y: 235 };
+                const rightEye = { x: 360, y: 235 };
+                const eyeWidth = 50;
+                
+                this.ctx.globalAlpha = this.intensity;
+                this.drawSimpleEyelashes(leftEye, 'left');
+                this.drawSimpleEyelashes(rightEye, 'right');
+                
+                this.ctx.restore();
+                
+                requestAnimationFrame(() => this.animateDemoLashes());
+            }
+
+            async startDetection() {
+                this.isDetecting = true;
+                this.updateStatus('✨ Camera active! Look directly at the camera for best results');
+                this.detectFaces();
+            }
+
+            async detectFaces() {
+                if (!this.isDetecting) return;
+
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.isModelLoaded && this.video.readyState === 4) {
+                    try {
+                        const detections = await faceapi.detectAllFaces(this.video, new faceapi.TinyFaceDetectorOptions())
+                            .withFaceLandmarks();
+
+                        if (detections && detections.length > 0) {
+                            detections.forEach(detection => {
+                                this.drawEyelashes(detection.landmarks);
+                            });
+                        } else {
+                            this.drawFallbackEyelashes();
+                        }
+                    } catch (error) {
+                        this.drawFallbackEyelashes();
+                    }
+                } else {
+                    this.drawFallbackEyelashes();
+                }
+
+                requestAnimationFrame(() => this.detectFaces());
+            }
+
+            drawEyelashes(landmarks) {
+                const leftEye = landmarks.getLeftEye();
+                const rightEye = landmarks.getRightEye();
+                
+                this.drawEyelashesForEye(leftEye, 'left');
+                this.drawEyelashesForEye(rightEye, 'right');
+            }
+
+            drawFallbackEyelashes() {
+                // Fallback positioning based on typical face proportions
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height * 0.4;
+                const eyeDistance = this.canvas.width * 0.15;
+                
+                const leftEyeCenter = { x: centerX - eyeDistance, y: centerY };
+                const rightEyeCenter = { x: centerX + eyeDistance, y: centerY };
+                
+                this.drawSimpleEyelashes(leftEyeCenter, 'left');
+                this.drawSimpleEyelashes(rightEyeCenter, 'right');
+            }
+
+            drawEyelashesForEye(eyePoints, side) {
+                if (!eyePoints || eyePoints.length === 0) return;
+                
+                const eyeCenter = this.getEyeCenter(eyePoints);
+                const eyeWidth = this.getEyeWidth(eyePoints);
+                
+                this.ctx.save();
+                this.ctx.globalAlpha = this.intensity;
+                
+                switch(this.currentStyle) {
+                    case 'natural':
+                        this.drawNaturalLashes(eyeCenter, eyeWidth, side);
+                        break;
+                    case 'dramatic':
+                        this.drawDramaticLashes(eyeCenter, eyeWidth, side);
+                        break;
+                    case 'cat-eye':
+                        this.drawCatEyeLashes(eyeCenter, eyeWidth, side);
+                        break;
+                    case 'doll-eye':
+                        this.drawDollEyeLashes(eyeCenter, eyeWidth, side);
+                        break;
+                }
+                
+                this.ctx.restore();
+            }
+
+            drawSimpleEyelashes(eyeCenter, side) {
+                this.ctx.save();
+                this.ctx.globalAlpha = this.intensity;
+                
+                const eyeWidth = this.canvas.width * 0.08;
+                
+                switch(this.currentStyle) {
+                    case 'natural':
+                        this.drawNaturalLashes(eyeCenter, eyeWidth, side);
+                        break;
+                    case 'dramatic':
+                        this.drawDramaticLashes(eyeCenter, eyeWidth, side);
+                        break;
+                    case 'cat-eye':
+                        this.drawCatEyeLashes(eyeCenter, eyeWidth, side);
+                        break;
+                    case 'doll-eye':
+                        this.drawDollEyeLashes(eyeCenter, eyeWidth, side);
+                        break;
+                }
+                
+                this.ctx.restore();
+            }
+
+            getEyeCenter(eyePoints) {
+                const avgX = eyePoints.reduce((sum, p) => sum + p.x, 0) / eyePoints.length;
+                const avgY = eyePoints.reduce((sum, p) => sum + p.y, 0) / eyePoints.length;
+                return { x: avgX, y: avgY };
+            }
+
+            getEyeWidth(eyePoints) {
+                const xCoords = eyePoints.map(p => p.x);
+                return Math.max(...xCoords) - Math.min(...xCoords);
+            }
+
+            drawNaturalLashes(center, width, side) {
+                this.ctx.strokeStyle = '#2c1810';
+                this.ctx.lineWidth = 1.5;
+                this.ctx.lineCap = 'round';
+                
+                const lashCount = 12;
+                const lashLength = width * 0.3;
+                
+                for (let i = 0; i < lashCount; i++) {
+                    const t = i / (lashCount - 1);
+                    const x = center.x - width/2 + width * t;
+                    const y = center.y - 3;
+                    
+                    const angle = (side === 'left' ? -0.2 : 0.2) + (t - 0.5) * 0.3;
+                    const length = lashLength * (0.7 + 0.3 * Math.sin(t * Math.PI));
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y);
+                    this.ctx.lineTo(x + Math.sin(angle) * length, y - Math.cos(angle) * length);
+                    this.ctx.stroke();
+                }
+            }
+
+            drawDramaticLashes(center, width, side) {
+                this.ctx.strokeStyle = '#1a0f08';
+                this.ctx.lineWidth = 2;
+                this.ctx.lineCap = 'round';
+                
+                const lashCount = 15;
+                const lashLength = width * 0.5;
+                
+                for (let i = 0; i < lashCount; i++) {
+                    const t = i / (lashCount - 1);
+                    const x = center.x - width/2 + width * t;
+                    const y = center.y - 4;
+                    
+                    const angle = (side === 'left' ? -0.3 : 0.3) + (t - 0.5) * 0.4;
+                    const length = lashLength * (0.8 + 0.4 * Math.sin(t * Math.PI));
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y);
+                    this.ctx.lineTo(x + Math.sin(angle) * length, y - Math.cos(angle) * length);
+                    this.ctx.stroke();
+                    
+                    // Add thickness with second stroke
+                    this.ctx.globalAlpha = this.intensity * 0.5;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.stroke();
+                    this.ctx.globalAlpha = this.intensity;
+                    this.ctx.lineWidth = 2;
+                }
+            }
+
+            drawCatEyeLashes(center, width, side) {
+                this.ctx.strokeStyle = '#2c1810';
+                this.ctx.lineWidth = 1.8;
+                this.ctx.lineCap = 'round';
+                
+                const lashCount = 14;
+                const lashLength = width * 0.4;
+                
+                for (let i = 0; i < lashCount; i++) {
+                    const t = i / (lashCount - 1);
+                    const x = center.x - width/2 + width * t;
+                    const y = center.y - 3;
+                    
+                    // More dramatic angle towards outer corner
+                    const baseAngle = side === 'left' ? -0.4 : 0.4;
+                    const angle = baseAngle * (0.5 + t * 0.8);
+                    const length = lashLength * (0.6 + 0.6 * t); // Longer towards outer corner
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y);
+                    this.ctx.lineTo(x + Math.sin(angle) * length, y - Math.cos(angle) * length);
+                    this.ctx.stroke();
+                }
+            }
+
+            drawDollEyeLashes(center, width, side) {
+                this.ctx.strokeStyle = '#2c1810';
+                this.ctx.lineWidth = 1.6;
+                this.ctx.lineCap = 'round';
+                
+                const lashCount = 16;
+                const lashLength = width * 0.35;
+                
+                for (let i = 0; i < lashCount; i++) {
+                    const t = i / (lashCount - 1);
+                    const x = center.x - width/2 + width * t;
+                    const y = center.y - 2;
+                    
+                    // Straighter lashes for doll-eye effect
+                    const angle = (t - 0.5) * 0.2;
+                    // Longer in the center for wide-eyed look
+                    const centerBoost = 1 - Math.abs(t - 0.5) * 1.5;
+                    const length = lashLength * (0.8 + 0.4 * centerBoost);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y);
+                    this.ctx.lineTo(x + Math.sin(angle) * length, y - Math.cos(angle) * length);
+                    this.ctx.stroke();
+                }
+            }
+
+            updateStatus(message) {
+                document.getElementById('status').textContent = message;
+            }
+        }
+
+        // Initialize the app
+        let eyelashApp;
+        window.addEventListener('load', () => {
+            eyelashApp = new EyelashTryOn();
+        });
+    </script>
+</body>
+</html>
